@@ -1,4 +1,4 @@
-﻿# FTLCheck â€” SSD Flash Translation Layer + Validation Framework
+﻿# FTLCheck an” SSD Flash Translation Layer + Validation Framework
 
 Two things in one C++17 codebase, mirroring how SSD firmware is
 actually built and tested:
