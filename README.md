@@ -1,16 +1,16 @@
-﻿# FTLCheck an” SSD Flash Translation Layer + Validation Framework
+# FTLCheck - SSD Flash Translation Layer + Validation Framework
 
 Two things in one C++17 codebase, mirroring how SSD firmware is
 actually built and tested:
 
-1. **The firmware side** â€” a working **Flash Translation Layer (FTL)**
-   over a modeled raw NAND chip: logicalâ†’physical page mapping,
+1. **The firmware side**: a working **Flash Translation Layer (FTL)**
+   over a modeled raw NAND chip: logical-to-physical page mapping,
    **garbage collection**, **wear leveling**, **bad-block management**,
    and **power-loss recovery** from on-flash OOB metadata.
-2. **The validation side** â€” a from-scratch **test framework**
+2. **The validation side**: a from-scratch **test framework**
    (factory-registered test cases, singleton runner, fixtures,
    assertion macros) with **fault injection**: power loss mid-write,
-   bit flips, erase failures â€” plus console results and a
+   bit flips, erase failures, plus console results and a
    self-contained **HTML report**.
 
 23 tests across 5 suites, all passing. ~1,700 lines. No dependencies.
@@ -34,8 +34,8 @@ make memguard                               build with MemGuard (../memguard)
 
 NAND flash has brutal rules: write one **page** at a time, erase only a
 whole **block**, never overwrite a programmed page, and every block
-dies after ~thousands of erases. The FTL makes that mess look like a
-normal overwritable disk â€” it is the heart of every SSD's firmware.
+dies after a few thousand erases. The FTL makes that mess look like a
+normal overwritable disk. It is the heart of every SSD's firmware.
 
 ## Architecture
 
@@ -90,19 +90,19 @@ normal overwritable disk â€” it is the heart of every SSD's firmware.
 ## The two bugs the framework caught in its own FTL (true story)
 
 1. **Wear-leveling starvation**: GC victims tied at 0 valid pages were
-   picked by lowest index â€” so blocks 0â€“2 absorbed ALL erases (9/9/8)
+   picked by lowest index, so blocks 0-2 absorbed ALL erases (9/9/8)
    while 13 blocks sat at zero. Fix: break ties by erase count. The
-   demo's wear table now shows a 1â€“2 erase spread across all 16 blocks.
+   demo's wear table now shows a 1-2 erase spread across all 16 blocks.
 2. **Free-pool bleed on grown-bad blocks**: when a GC victim failed its
    erase, that round reclaimed nothing and the free pool shrank until a
    later write hit "no free block available". Fix: GC loops until a
    block is genuinely reclaimed. Caught by the erase-failure injection
    test.
 
-Both are exactly the class of bug SSD firmware teams hunt â€” which is
+Both are exactly the class of bug SSD firmware teams hunt, which is
 the point of building the validator alongside the firmware.
 
-## Design decisions I can defend
+## Design decisions
 
 - **Page-level mapping** (vs block-level): more RAM, far less write
   amplification; real SSDs use hybrids.
@@ -110,16 +110,15 @@ the point of building the validator alongside the firmware.
   BCH/LDPC codes that also correct; detection is the honest MVP.
 - **Greedy GC victim selection** (fewest valid, then least worn).
 - **Overprovisioning (4 of 16 blocks)**: guarantees GC always has
-  headroom â€” why a "256 GB" SSD contains more than 256 GB of flash.
+  headroom. This is why a "256 GB" SSD contains more than 256 GB of
+  actual flash inside.
 - **Recovery seals partial blocks as Full** rather than resuming them:
   simple and safe; GC reclaims the tail later.
 
 ## Limitations (known, deliberate)
 
 - Detection without correction (no real ECC).
-- No static wear leveling (cold blocks are not proactively rotated) â€”
-  I can explain how I'd add it.
+- No static wear leveling (cold blocks are not proactively rotated).
 - Map lives fully in RAM and is rebuilt by full scan; real drives
   checkpoint the map to flash to speed up boot.
 - Single-threaded; real firmware pipelines NAND operations.
-
